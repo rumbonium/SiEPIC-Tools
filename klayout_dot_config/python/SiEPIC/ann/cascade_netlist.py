@@ -248,12 +248,18 @@ class Cell():
         alpha = TE_loss/(20*np.log10(np.exp(1)))  
 
         w = np.asarray(self.f) * 2 * np.pi #get angular frequency from frequency
-        lam0 = float(coeffs[0]) #center wavelength
+        lam0 = float(coeffs[0]) #1.55e-6 # #center wavelength
         w0 = (2*np.pi*c0) / lam0 #center frequency (angular)
         
-        ne = float(coeffs[1]) #effective index
-        ng = float(coeffs[3]) #group index
-        nd = float(coeffs[5]) #group dispersion
+        
+        # ne = float(coeffs[1]) #effective index
+        # ng = float(coeffs[3]) #group index
+        # nd = float(coeffs[5]) #group dispersion
+        
+
+        ne = 2.43 #effective index
+        ng = 4.16 #group index
+        nd = 0.0001 #group dispersion
         
         #calculation of K
         K = 2*np.pi*ne/lam0 + (ng/c0)*(w - w0) - (nd*lam0**2/(4*np.pi*c0))*((w - w0)**2)
@@ -367,6 +373,7 @@ class Parser:
         else:
             newCell.f = np.linspace(interpRange[0], interpRange[1], numInterpPoints)
             newCell.wgSparam(width, thickness, deltaLength)
+            # newCell.wgSparamSiEIPC()
         self.cellList.append(newCell)
 
 

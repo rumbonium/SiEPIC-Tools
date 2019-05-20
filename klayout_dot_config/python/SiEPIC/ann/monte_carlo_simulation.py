@@ -122,7 +122,7 @@ def run_monte_carlo_sim(num_sims, mu_width, sigma_width, mu_thickness, sigma_thi
     '''
 
 def main():
-    num_sims = 10
+    num_sims = 100
     mu_width = 0.5
     sigma_width = 0.005
     mu_thickness = 0.22
