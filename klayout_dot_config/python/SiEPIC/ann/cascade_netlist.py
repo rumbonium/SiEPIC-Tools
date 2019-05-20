@@ -10,7 +10,8 @@ import pya
 from SiEPIC.ann import qopticParser1 as qp
 from enum import Enum
 import skrf as rf
-from SiEPIC.ann import waveguideNN as wn
+#from SiEPIC.ann import waveguideNN as wn
+from SiEPIC.ann import loadNN as ln
 from scipy.interpolate import splev, splrep, interp1d
 
 '''
@@ -30,8 +31,8 @@ This file defines 3 classes:
 the model itself, respectively
 Both are used as global variables in the 'cascade_netlist' module
 '''
-path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "NN_SiO2_neff.h5")
-model = wn.loadWaveguideNN(path)
+#path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "NN_SiO2_neff.h5")
+#model = wn.loadWaveguideNN(path)
 
 numInterpPoints = 2000
 
@@ -211,7 +212,8 @@ class Cell():
         wl = np.true_divide(c0,self.f)
 
         # effective index is calculated by the ANN
-        neff = wn.getWaveguideIndex(model,np.transpose(wl),width,thickness,mode)
+        # neff = wn.getWaveguideIndex(model,np.transpose(wl),width,thickness,mode)
+        neff = ln.straightWaveguide(np.transpose(wl), width, thickness, 0)
 
         #K is calculated from the effective index and wavelength
         K = (2*np.pi*np.true_divide(neff,wl))
