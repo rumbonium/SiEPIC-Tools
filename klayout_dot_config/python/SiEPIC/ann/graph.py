@@ -20,18 +20,124 @@ import numpy as np
 import scipy.io as sio
 import os # For filedialog to start in user's /~ instead of /.
 
-try:
-    from SiEPIC.ann.layout.graphing.ListSelectDialog import ListSelectDeleteDialog, ListSelectRenameDialog
-except:
-    try:
-        from ListSelectDialog import ListSelectDeleteDialog, ListSelectRenameDialog
-    except:
-        from graphing.ListSelectDialog import ListSelectDeleteDialog, ListSelectRenameDialog
+
+class ListSelectDeleteDialog:
+    """Opens a dialog window presenting a list of items passed in as a parameter.
+
+    Delete button removes items from the list. Deleted items are the return value.
+
+    Usage: ListSelectDeleteDialog(master: tk.Toplevel).askdeletelist(startlist: list)
+    """
+
+    def __init__(self, master: tk.Toplevel):
+        self.master = master
+
+    def askdeletelist(self, startlist: list):
+        self.listbox = tk.Listbox(self.master)
+        self.listbox.pack()
+        self.deleted = []
+        self.leftover = startlist
+        self.success = True
+        self.master.protocol("WM_DELETE_WINDOW", self._cancel)
+
+        for item in startlist:
+            self.listbox.insert(tk.END, item)
+
+        frame_okCancel = tk.Frame(self.master)
+        deleteBtn = tk.Button(frame_okCancel, text="Delete", command=lambda: self._delete(self.listbox))
+        deleteBtn.grid(column=0, row=0)
+        okBtn = tk.Button(frame_okCancel, text="Ok", command=self._on_close)
+        okBtn.grid(column=1, row=0)
+        cancelBtn = tk.Button(frame_okCancel, text="Cancel", command=self._cancel)
+        cancelBtn.grid(column=2, row=0)
+        frame_okCancel.pack()
+
+        self.master.grab_set()
+        self.master.wait_window(self.master)
+        if self.success:
+            return self.deleted
+        else:
+            return None
+
+    def _delete(self, listbox: tk.Listbox):
+        selection = listbox.curselection()[0]
+        self.deleted.append(self.leftover.pop(selection))
+        listbox.delete(selection)        
+
+    def _cancel(self):
+        self.success = False
+        self._on_close()
+
+    def _on_close(self):
+        self.master.destroy()
+
+
+class ListSelectRenameDialog:
+    """Opens a dialog window presenting a list of items passed in as a parameter.
+
+    Rename button opens a text dialog to rename an item from the list. Returns a tuple, the original name
+    and the new name.
+
+    Usage: ListSelectRenameDialog(master: tk.Toplevel).askrenamelist(startlist: list)
+    """
+
+    def __init__(self, master: tk.Toplevel):
+        self.master = master
+
+    def askrenamelist(self, startlist: list):
+        self.listbox = tk.Listbox(self.master)
+        self.listbox.pack()
+        self.leftover = startlist
+        self.success = True
+        self.master.protocol("WM_DELETE_WINDOW", self._cancel)
+
+        for item in startlist:
+            self.listbox.insert(tk.END, item)
+
+        frame_okCancel = tk.Frame(self.master)
+        deleteBtn = tk.Button(frame_okCancel, text="Rename", command=lambda: self._rename(self.listbox))
+        deleteBtn.grid(column=0, row=0)
+        cancelBtn = tk.Button(frame_okCancel, text="Cancel", command=self._cancel)
+        cancelBtn.grid(column=1, row=0)
+        frame_okCancel.pack()
+
+        self.master.grab_set()
+        self.master.wait_window(self.master)
+        if self.success:
+            return self.original, self.final
+        else:
+            return None, None
+
+    def _rename(self, listbox: tk.Listbox):
+        selection = listbox.curselection()[0]
+        self.original = self.leftover.pop(selection)
+        self.master.withdraw()
+        self.final = simpledialog.askstring("Rename", "Enter new name for line: " + self.original)
+        self.master.destroy()
+
+    def _cancel(self):
+        self.success = False
+        self._on_close()
+
+    def _on_close(self):
+        self.master.destroy()
 
 class MenuItem:
     def __init__(self, label=None, callback=None):
         self.label = label
         self.callback = callback
+
+class MenuGroup:
+    """
+    TODO: Implement such that classing importing graph don't have to create their own dictionaries
+    but can just create a MenuGroup and pass that in to the Graph.
+    """
+
+    def __init__(self):
+        self.menuitems = []
+
+    def add(self, item: MenuItem):
+        self.menuitems.append(item)
 
 class DataSet:
     """
@@ -191,8 +297,7 @@ class Graph:
         #filemenu.add_command(label="Open", command=self.filemenu_Open)
         filemenu.add_command(label="Close", command=self.filemenu_Close)
         filemenu.add_separator()
-        filemenu.add_command(label="Export to .mat", command=self.filemenu_ExportMat)
-        #filemenu.add_command(label="Save as .txt")
+        filemenu.add_command(label="Export to...", command=self.filemenu_Export)
         #filemenu.add_separator()
         #filemenu.add_command(label="Print")
         self.menubar.add_cascade(label="File", menu=filemenu)
@@ -212,6 +317,7 @@ class Graph:
         windowsize_submenu.add_command(label="Default")
         windowsize_submenu.add_command(label="Large")
         editmenu.add_cascade(label="Resize window", menu=windowsize_submenu)
+        editmenu.add_command(label="Tight layout", command=self.tight_layout)
         self.menubar.add_cascade(label="Edit", menu=editmenu)
 
         insertmenu = tk.Menu(self.menubar, tearoff=0)
@@ -249,19 +355,33 @@ class Graph:
         f = filedialog.askopenfilename(**options)
         print("TODO")        
 
-    def filemenu_ExportMat(self):
+    def filemenu_Export(self):
+        """
+        If saved as .npz, note that it's a dictionary of lines being saved.
+        On loading, you must specify allow_pickle=True.
+        To access items in the dictionary, first take them out of the array.
+
+        Example:
+        --------
+        a = np.load('sample.npz')
+        contents = a['lines'].item()
+        """
         line_dict = {}
         for line in self.lines.values():
             for name, arr in line.to_mat().items():
                 line_dict[name] = arr
-        fileTypes = [("MATLAB file","*.mat")]
+        fileTypes = [("MATLAB file","*.mat"), ("NumPy file","*.npz")]
         options = {}
         options['initialdir'] = os.path.expanduser('~')
         options['filetypes'] = fileTypes
         options['parent'] = self.master
         filename = filedialog.asksaveasfilename(**options)
         if filename:
-            sio.savemat(filename, line_dict)
+            _, ext = os.path.splitext(filename)
+            if ext == ".mat":
+                sio.savemat(filename, line_dict)
+            elif ext == ".npz":
+                np.savez(filename, lines=line_dict)
             
     def editmenu_DeleteLine(self):
         linelist = []
@@ -482,6 +602,12 @@ class Graph:
 
         self.ax.relim()
         self.ax.autoscale_view()
+        self.canvas.draw()
+
+    def tight_layout(self):
+        """Applies the tight layout to the figure.
+        """
+        self.fig.tight_layout()
         self.canvas.draw()
 
 #########################################################################
