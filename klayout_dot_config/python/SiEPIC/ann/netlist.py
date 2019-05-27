@@ -232,7 +232,8 @@ import pya
 # from SiEPIC.ann import qopticParser1 as qp
 from enum import Enum
 import skrf as rf
-from SiEPIC.ann import waveguideNN as wn
+#from SiEPIC.ann import waveguideNN as wn
+from SiEPIC.ann import loadNN as ln
 from scipy.interpolate import splev, splrep, interp1d
 
 '''
@@ -252,8 +253,8 @@ This file defines 3 classes:
 the model itself, respectively
 Both are used as global variables in the 'cascade_netlist' module
 '''
-path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "NN_SiO2_neff.h5")
-model = wn.loadWaveguideNN(path)
+#path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "NN_SiO2_neff.h5")
+#model = wn.loadWaveguideNN(path)
 
 numInterpPoints = 2000
 
@@ -433,7 +434,8 @@ class Cell():
         wl = np.true_divide(c0,self.f)
 
         # effective index is calculated by the ANN
-        neff = wn.getWaveguideIndex(model,np.transpose(wl),width,thickness,mode)
+        # neff = wn.getWaveguideIndex(model,np.transpose(wl),width,thickness,mode)
+        neff = ln.straightWaveguide(np.transpose(wl), width, thickness, 0)
 
         #K is calculated from the effective index and wavelength
         K = (2*np.pi*np.true_divide(neff,wl))
@@ -470,12 +472,18 @@ class Cell():
         alpha = TE_loss/(20*np.log10(np.exp(1)))  
 
         w = np.asarray(self.f) * 2 * np.pi #get angular frequency from frequency
-        lam0 = float(coeffs[0]) #center wavelength
+        lam0 = float(coeffs[0]) #1.55e-6 # #center wavelength
         w0 = (2*np.pi*c0) / lam0 #center frequency (angular)
         
-        ne = float(coeffs[1]) #effective index
-        ng = float(coeffs[3]) #group index
-        nd = float(coeffs[5]) #group dispersion
+        
+        # ne = float(coeffs[1]) #effective index
+        # ng = float(coeffs[3]) #group index
+        # nd = float(coeffs[5]) #group dispersion
+        
+
+        ne = 2.43 #effective index
+        ng = 4.16 #group index
+        nd = 0.0001 #group dispersion
         
         #calculation of K
         K = 2*np.pi*ne/lam0 + (ng/c0)*(w - w0) - (nd*lam0**2/(4*np.pi*c0))*((w - w0)**2)
