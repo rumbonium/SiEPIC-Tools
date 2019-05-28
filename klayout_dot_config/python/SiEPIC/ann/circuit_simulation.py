@@ -1,3 +1,23 @@
+"""
+circuit_simulation.py
+
+Author:
+    Sequoia Ploeg
+
+Dependencies:
+- tkinter
+- SiEPIC._globals
+- SiEPIC.ann.graph, SiEPIC.ann.simulation
+- scipy
+- numpy
+- os
+- matplotlib
+
+This file mainly provides the GUI for running simulations. It creates a 
+Simulation object, runs it, and provides controls and windows for displaying
+and exporting the results.
+"""
+
 import tkinter as tk
 from tkinter import filedialog
 
@@ -106,8 +126,9 @@ class CircuitAnalysisGUI():
 
     def generate_schematic(self):
         """
-        This function creates a figure object and places it within the schematic slot in the parent
-        tkinter window. It then calls 'draw' to plot the layout points on the canvas.
+        This function creates a figure object and places it within the 
+        schematic slot in the parent tkinter window. It then calls 'draw' to 
+        plot the layout points on the canvas.
         """
         # The only real objects we'll need to interact with to plot and unplot
         self.components = self.simulation.external_components
@@ -122,9 +143,9 @@ class CircuitAnalysisGUI():
 
     def draw(self):
         for comp in self.components:
-            self.ax.plot(comp.posx, comp.posy, 'ro')
-            externals = [x for x in comp.ports if x < 0 ]
-            self.ax.text(comp.posx, comp.posy, "  Port " + str(-externals[0]) + ": " + comp.label)
+            self.ax.plot(comp.lay_x, comp.lay_y, 'ro')
+            externals = [int(x) for x in comp.nets if int(x) < 0 ]
+            self.ax.text(comp.lay_x, comp.lay_y, "  Port " + str(-externals[0]) + ": " + comp.__class__.__name__)
         self.ax.axis('off')
         self.canvas.draw()
 
@@ -189,7 +210,7 @@ class CircuitAnalysisGUI():
     def open_magnitude(self):
         if self.magnitude is None:
             self.magnitude = Graph(self.parent, "Magnitude", additional_menus=self.additional_menus(), onCloseCallback=self._magnitude_closed)
-            self.magnitude.ylabel(r'$|A| ^2$')
+            self.magnitude.ylabel(r'$|E| ^2$')
             self.magnitude.title('Magnitude-Squared')
         else:
             self.magnitude.raise_window()
