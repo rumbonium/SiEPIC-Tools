@@ -1,25 +1,61 @@
+"""
+simulation.py
+
+Authors: 
+    Sequoia Ploeg
+    Hyrum Gunther
+
+Dependencies:
+- numpy
+- copy
+- pya
+- SiEPIC.ann.models, SiEPIC.ann.netlist
+- scipy
+- matplotlib
+- time
+
+This file contains all classes and functions related to running simulations
+of photonic circuits and formatting their data in useful ways.
+"""
+
+import pya
 import numpy as np
 import copy
+from scipy.interpolate import interp1d
 
-from SiEPIC.ann import getSparams as gs
-from SiEPIC.ann import NetlistDiagram
+from SiEPIC.ann import models
+from SiEPIC.ann import netlist
+
+class SimulationSetup:
+    NUM_INTERP_POINTS = 2000
+    INTERP_RANGE = (1.88e+14, 1.99e+14)
+    FREQUENCY_RANGE = np.linspace(INTERP_RANGE[0], INTERP_RANGE[1], NUM_INTERP_POINTS) 
+
+    @staticmethod
+    def interpolate(freq, sparams):
+        func = interp1d(freq, sparams, kind='cubic', axis=0)
+        return [SimulationSetup.FREQUENCY_RANGE, func(SimulationSetup.FREQUENCY_RANGE)]
+
+
+
 
 class MathPrefixes:
     TERA = 1e12
     NANO = 1e-9
     c = 299792458
 
+
+
+
 class Simulation:
     def __init__(self):
-        # parameters for generating waveguide s parameters
-        waveguideWidth = 0.5
-        waveguideThickness = 0.22
-        waveguideLengthDelta = 0
         # Get s parameters and frequencies (generates the netlist, too).
-        self.s_matrix, self.frequency = gs.getSparams(waveguideWidth, waveguideThickness, waveguideLengthDelta)
-        self.ports = gs.getPorts(waveguideWidth, waveguideThickness, waveguideLengthDelta)
+        cell = pya.Application.instance().main_window().current_view().active_cellview().cell
+        _, _, ann_netlist_model = cell.spice_netlist_export_ann()
 
-        self.external_port_list, self.external_components = NetlistDiagram.getExternalPortList()
+        self.s_matrix, self.frequency, self.ports, self.external_components = netlist.get_sparameters(ann_netlist_model) 
+        self.external_port_list = [-int(x) for x in self.ports]
+        self.external_port_list.sort()
         self._rearrangeSMatrix()
         return
 
@@ -75,6 +111,10 @@ import matplotlib.pyplot as plt
 from scipy.io import savemat
 import time
 
+class MCSimulation:
+    def __init__(self):
+        pass
+
 DEF_NUM_SIMS = 10
 DEF_MU_WIDTH = 0.5
 DEF_SIGMA_WIDTH = 0.005
@@ -88,9 +128,20 @@ DEF_SAVEDATA = True
 DEF_DISPTIME = True
 DEF_FILENAME = "monte_carlo.mat"
 
-def monte_carlo_sim(num_sims=DEF_NUM_SIMS, mu_width=DEF_MU_WIDTH, sigma_width=DEF_SIGMA_WIDTH, mu_thickness=DEF_MU_THICKNESS,
-    sigma_thickness=DEF_SIGMA_THICKNESS, mu_length=DEF_MU_LENGTH, sigma_length=DEF_SIGMA_LENGTH, dpin=DEF_DPIN, dpout=DEF_DPOUT, 
-    saveData=False, filename=None, dispTime=False, printer=None):
+def monte_carlo_sim(num_sims=DEF_NUM_SIMS, 
+                    mu_width=DEF_MU_WIDTH, 
+                    sigma_width=DEF_SIGMA_WIDTH, 
+                    mu_thickness=DEF_MU_THICKNESS,
+                    sigma_thickness=DEF_SIGMA_THICKNESS, 
+                    mu_length=DEF_MU_LENGTH, 
+                    sigma_length=DEF_SIGMA_LENGTH, 
+                    dpin=DEF_DPIN, 
+                    dpout=DEF_DPOUT, 
+                    saveData=False, 
+                    filename=None, 
+                    dispTime=False, 
+                    printer=None):
+    printer("Monte Carlo Simulation")
 
     # optional timer
     start = time.time()
@@ -104,38 +155,49 @@ def monte_carlo_sim(num_sims=DEF_NUM_SIMS, mu_width=DEF_MU_WIDTH, sigma_width=DE
     # random distribution for length change
     random_deltaLength = np.random.normal(mu_length, sigma_length, num_sims)
 
+    # printer(str(random_width) + " " + str(random_thickness) + " " + str(random_deltaLength))
+
+    cell = pya.Application.instance().main_window().current_view().active_cellview().cell
+    _, _, ann_netlist_model = cell.spice_netlist_export_ann()
+
     # run simulation with mean width and thickness
-    mean_s, frequency = gs.getSparams(mu_width, mu_thickness, 0)
+    mean_s, frequency, _, _ = netlist.get_sparameters(ann_netlist_model) 
+    # mean_s, frequency = gs.getSparams(mu_width, mu_thickness, 0)
     results_shape = np.append(np.asarray([num_sims]), mean_s.shape)
     results = np.zeros([dim for dim in results_shape], dtype='complex128')
 
     # run simulations with varied width and thickness
     for sim in range(num_sims):
+        modified_netlist = copy.deepcopy(ann_netlist_model)
+        for component in modified_netlist.component_list:
+            if component.__class__.__name__ == "ebeam_wg_integral_1550":
+                component.width = random_width[sim]
+                component.height = random_thickness[sim]
+                # Implement length monte carlo
         #random_deltaLength[sim]
-        results[sim, :, :, :] = gs.getSparams(random_width[sim], random_thickness[sim], random_deltaLength[sim])[0]
+        s, _, p, _ = netlist.get_sparameters(modified_netlist)
+        results[sim, :, :, :] = s
         if ((sim % 10) == 0) and dispTime:
             print(sim)
 
-    # rearrange matrix so matrix indices line up with proper port numbers
-    p = gs.getPorts(random_width[0], random_thickness[0], 0)
+#     # rearrange matrix so matrix indices line up with proper port numbers
     p = [int(i) for i in p]
     rp = copy.deepcopy(p)
     rp.sort(reverse=True)
-    # TODO: Remove this duplicate code. It's been implemented once in the Simulation.py class
-    concatinate_order = [p.index(i) for i in rp]
+    concatenate_order = [p.index(i) for i in rp]
     temp_res = copy.deepcopy(results)
     temp_mean = copy.deepcopy(mean_s)
     re_res = np.zeros(results_shape, dtype=complex)
     re_mean = np.zeros(mean_s.shape, dtype=complex)
     i=0
-    for idx in concatinate_order:
+    for idx in concatenate_order:
         re_res[:,:,i,:]  = temp_res[:,:,idx,:]
         re_mean[:,i,:] = temp_mean[:,idx,:]
         i += 1
     temp_res = copy.deepcopy(re_res)
     temp_mean = copy.deepcopy(re_mean)
     i=0
-    for idx in concatinate_order:
+    for idx in concatenate_order:
         re_res[:,:,:,i] = temp_res[:,:,:,idx]
         re_mean[:,:,i] = temp_mean[:,:,idx]
         i+= 1    
