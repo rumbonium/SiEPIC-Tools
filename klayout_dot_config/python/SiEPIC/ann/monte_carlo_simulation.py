@@ -1,18 +1,24 @@
-import pya
-import sys
-import os
-import numpy as np
-import copy
-import matplotlib.pyplot as plt
-from scipy.stats import kde
-from SiEPIC.ann import getSparams as gs
-from SiEPIC.ann.simulation import monte_carlo_sim
-from scipy.io import savemat
-from scipy.signal import find_peaks
-import time
+"""
+monte_carlo_simulation.py
 
+Author:
+    Sequoia Ploeg
+
+Dependencies:
+- tkinter
+- SiEPIC.ann.simulation
+- os
+
+This file mainly provides the GUI for running monte carlo simulations. It 
+creates a MCSimulation object and runs it, provides various parameters from its
+GUI. Presently, the MCSimulation object handles displaying the results itself.
+"""
+
+import os
 import tkinter as tk
 from tkinter import filedialog
+
+from SiEPIC.ann.simulation import monte_carlo_sim
 
 DEF_NUM_SIMS = 10
 DEF_MU_WIDTH = 0.5
@@ -81,7 +87,7 @@ class MonteCarloGUI(tk.Tk):
         self.mean_length.grid(row=2, column=1)
         self.mean_length.insert(0, str(DEF_MU_LENGTH))
 
-        io_group = tk.LabelFrame(bbox, text="I/O", padx=padx, pady=pady)
+        io_group = tk.LabelFrame(bbox, text="I/O (0-indexed)", padx=padx, pady=pady)
         io_group.pack(fill=tk.BOTH, expand=1)
         tk.Label(io_group, text="Input port:").grid(row=0, column=0)
         self.in_port = tk.Entry(io_group)
