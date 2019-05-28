@@ -232,8 +232,9 @@ import pya
 # from SiEPIC.ann import qopticParser1 as qp
 from enum import Enum
 import skrf as rf
-#from SiEPIC.ann import waveguideNN as wn
-from SiEPIC.ann import loadNN as ln
+# from SiEPIC.ann import waveguideNN as wn
+# from SiEPIC.ann import loadNN as ln
+from SiEPIC.ann import straightWaveguide as sw
 from scipy.interpolate import splev, splrep, interp1d
 
 '''
@@ -259,8 +260,6 @@ Both are used as global variables in the 'cascade_netlist' module
 numInterpPoints = 2000
 
 interpRange = (1.88e+14, 1.99e+14)
-#interpRange = (1.93e+14, 1.99e+14)
-
 
 def strToSci(str):
     '''
@@ -435,7 +434,7 @@ class Cell():
 
         # effective index is calculated by the ANN
         # neff = wn.getWaveguideIndex(model,np.transpose(wl),width,thickness,mode)
-        neff = ln.straightWaveguide(np.transpose(wl), width, thickness, 0)
+        neff = sw.straightWaveguide(np.transpose(wl), width, thickness, 90)
 
         #K is calculated from the effective index and wavelength
         K = (2*np.pi*np.true_divide(neff,wl))
